@@ -1,3 +1,5 @@
+! BIOS所引导的第一扇区，由BIOS和体系结构产生中断0x19后的中断服务程序将其加载到内存
+! 其中存放的代码用于加载后续操作系统的程序到内存
 !
 ! SYS_SIZE is the number of clicks (16 bytes) to be loaded.
 ! 0x3000 is 0x30000 bytes = 196kB, more than enough for current
