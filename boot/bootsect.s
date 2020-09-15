@@ -1,12 +1,18 @@
 ! BIOS所引导的第一扇区，由BIOS和体系结构产生中断0x19后的中断服务程序将其加载到内存
 ! 其中存放的代码用于加载后续操作系统的程序到内存
-! 该文件所占空间仅为一个扇区，即512B，0x20
+! 该文件所占空间仅为一个扇区，即512B，0x200
+! bootsect主要作用：
+! 	1.规划了内存的大致位置
+! 	2.复制自身至新位置
+! 	3.加载setup紧接其后面，约4个扇区
+! 	4.加载内核程序至0x10000，约240个扇区 
+! 	5.检查根设备
 !
 ! SYS_SIZE is the number of clicks (16 bytes) to be loaded.
 ! 0x3000 is 0x30000 bytes = 196kB, more than enough for current
 ! versions of linux
 !
-SYSSIZE = 0x3000
+SYSSIZE = 0x30000
 !
 !	bootsect.s		(C) 1991 Linus Torvalds
 !
@@ -34,20 +40,20 @@ begdata:
 begbss:
 .text
 
-! 内存规划，确保代码数据不会覆盖
-SETUPLEN = 4				! nr of setup-sectors 					由当前代码负责加载的setup程序的扇区数目
-BOOTSEG  = 0x07c0			! original address of boot-sector 		该代码段由BIOS加载的位置
-INITSEG  = 0x9000			! we move boot here - out of the way	bootsect后续存放位置 
-SETUPSEG = 0x9020			! setup starts here 					setup程序的位置
-SYSSEG   = 0x1000			! system loaded at 0x10000 (65536). 	内核加载位置
-ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading				内核末尾位置
+; TODO: 内存规划，确保代码数据不会覆盖
+SETUPLEN = 4				! nr of setup-sectors 					; 由当前代码负责加载的setup程序的扇区数目
+BOOTSEG  = 0x07c00			! original address of boot-sector 		; 该代码段由BIOS加载的位置
+INITSEG  = 0x90000			! we move boot here - out of the way	; bootsect后续存放位置 
+SETUPSEG = 0x90200			! setup starts here 					; setup程序的位置
+SYSSEG   = 0x10000			! system loaded at 0x10000 (65536). 	; 内核加载位置
+ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading				; 内核末尾位置
 
 ! ROOT_DEV:	0x000 - same type of floppy as boot.
 !		0x301 - first partition on first drive etc
-ROOT_DEV = 0x306													根文件系统设备号
+ROOT_DEV = 0x306													; 根文件系统设备号
 
-! bootsect开始复制自身，从BOOTSEG至INITSEG
-！语法：entry指定程序的入口点
+; TODO: bootsect开始复制自身，从BOOTSEG至INITSEG
+; 语法：entry指定程序的入口点
 entry start
 start:
 	mov	ax,#BOOTSEG
@@ -73,10 +79,12 @@ go:	mov	ax,cs
 ! Note that 'es' is already set up.
 ; 至此，复制操作完成，可以开始加载setup程序了
 
+; 使用中断服务程序0x13，首先传入参数
+; TODO: 从软盘的第二扇区开始，加载4个扇区的数据
 load_setup:
 	mov	dx,#0x0000		! drive 0, head 0
 	mov	cx,#0x0002		! sector 2, track 0
-	mov	bx,#0x0200		! address = 512, in INITSEG
+	mov	bx,#0x0200		! address = 512, in INITSEG    ; 加载的目的地址，即IITSEG往后一个扇区
 	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
 	int	0x13			! read it
 	jnc	ok_load_setup		! ok - continue
@@ -122,7 +130,7 @@ ok_load_setup:
 ! defined (!= 0), nothing is done and the given device is used.
 ! Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
 ! on the number of sectors that the BIOS reports currently.
-
+; TODO: 检查根设备
 	seg cs
 	mov	ax,root_dev
 	cmp	ax,#0
@@ -144,7 +152,7 @@ root_defined:
 ! after that (everyting loaded), we jump to
 ! the setup-routine loaded directly after
 ! the bootblock:
-
+; 跳转至setup程序执行
 	jmpi	0,SETUPSEG
 
 ! This routine loads the system at address 0x10000, making sure

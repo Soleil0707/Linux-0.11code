@@ -32,10 +32,10 @@ start:
 
 ! ok, the read went well so we get current cursor position and save it for
 ! posterity.
-
+; 开始获取机器系统数据
 	mov	ax,#INITSEG	! this is done in bootsect already, but...
 	mov	ds,ax
-	mov	ah,#0x03	! read cursor pos
+	mov	ah,#0x03	! read cursor pos 读取光标位置
 	xor	bh,bh
 	int	0x10		! save it in known place, con_init fetches
 	mov	[0],dx		! it from 0x90000.
