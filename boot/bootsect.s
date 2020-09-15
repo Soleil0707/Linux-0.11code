@@ -1,5 +1,6 @@
 ! BIOS所引导的第一扇区，由BIOS和体系结构产生中断0x19后的中断服务程序将其加载到内存
 ! 其中存放的代码用于加载后续操作系统的程序到内存
+! 该文件所占空间仅为一个扇区，即512B，0x20
 !
 ! SYS_SIZE is the number of clicks (16 bytes) to be loaded.
 ! 0x3000 is 0x30000 bytes = 196kB, more than enough for current
@@ -33,38 +34,44 @@ begdata:
 begbss:
 .text
 
-SETUPLEN = 4				! nr of setup-sectors
-BOOTSEG  = 0x07c0			! original address of boot-sector
-INITSEG  = 0x9000			! we move boot here - out of the way
-SETUPSEG = 0x9020			! setup starts here
-SYSSEG   = 0x1000			! system loaded at 0x10000 (65536).
-ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
+! 内存规划，确保代码数据不会覆盖
+SETUPLEN = 4				! nr of setup-sectors 					由当前代码负责加载的setup程序的扇区数目
+BOOTSEG  = 0x07c0			! original address of boot-sector 		该代码段由BIOS加载的位置
+INITSEG  = 0x9000			! we move boot here - out of the way	bootsect后续存放位置 
+SETUPSEG = 0x9020			! setup starts here 					setup程序的位置
+SYSSEG   = 0x1000			! system loaded at 0x10000 (65536). 	内核加载位置
+ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading				内核末尾位置
 
 ! ROOT_DEV:	0x000 - same type of floppy as boot.
 !		0x301 - first partition on first drive etc
-ROOT_DEV = 0x306
+ROOT_DEV = 0x306													根文件系统设备号
 
+! bootsect开始复制自身，从BOOTSEG至INITSEG
+！语法：entry指定程序的入口点
 entry start
 start:
 	mov	ax,#BOOTSEG
-	mov	ds,ax
+	mov	ds,ax			! ds存放老位置
 	mov	ax,#INITSEG
-	mov	es,ax
-	mov	cx,#256
-	sub	si,si
-	sub	di,di
-	rep
-	movw
-	jmpi	go,INITSEG
+	mov	es,ax			! es存放新位置
+	mov	cx,#256			! cx控制循环次数，256指字的数目，即2倍的字节数
+	sub	si,si			! si = si - si = 0
+	sub	di,di			! di = di - di = 0
+	rep					! 重复执行下一操作，即movw
+	movw				! 以字为单位进行传送
+	jmpi	go,INITSEG	! 段内跳转，即跳转至INITSEG段，偏移量为go处进行执行
+; 从此处开始，后面所执行的代码是在INITSEG中，前面执行的代码是在BOOTSEG中
+; 虽然代码一样，但在内存中的位置不同
 go:	mov	ax,cs
-	mov	ds,ax
-	mov	es,ax
+	mov	ds,ax			! 数据段寄存器
+	mov	es,ax			! 附加段寄存器
 ! put stack at 0x9ff00.
-	mov	ss,ax
-	mov	sp,#0xFF00		! arbitrary value >>512
-
+	mov	ss,ax			! 栈基址寄存器
+	mov	sp,#0xFF00		! arbitrary value >>512 栈顶指针
+; 此处开始有了栈，后续可进行一些复杂操作了
 ! load the setup-sectors directly after the bootblock.
 ! Note that 'es' is already set up.
+; 至此，复制操作完成，可以开始加载setup程序了
 
 load_setup:
 	mov	dx,#0x0000		! drive 0, head 0
