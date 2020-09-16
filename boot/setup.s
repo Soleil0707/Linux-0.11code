@@ -105,13 +105,13 @@ no_disk1:
 is_disk1:
 
 ! now we want to move to protected mode ...
-
+; 关中断，setup开始执行一些功能，为操作系统进入保护模式执行做准备工作
 	cli			! no interrupts allowed !
 
 ! first we move the system to it's rightful place
-
+; 移动内核代码，由0x10000至0x00000
 	mov	ax,#0x0000
-	cld			! 'direction'=0, movs moves forward
+	cld			! 'direction'=0, movs moves forward   ; 置位DF为0，使串操作往高位进行
 do_move:
 	mov	es,ax		! destination segment
 	add	ax,#0x1000
