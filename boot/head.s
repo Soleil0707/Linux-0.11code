@@ -11,26 +11,41 @@
  * the page directory will exist. The startup code will be overwritten by
  * the page directory.
  *
- * head.s文件有25KB+184B的空间
  */
+
+; head.s文件有25KB+184B的空间，最后仅剩184B，其余空间被覆盖
+head.s作用：
+	1.设置段基址寄存器
+	2.设置IDT，重设GDT
+	3.重设段基址寄存器
+	4.检查A20是否打开
+	5.设置协处理器（如果有）
+	6.压栈main函数入口地址
+	7.分页（一个页的页目录，4个页表，并填充其内容，即映射16MB的地址（因为当时的物理内存只有16MB））
+	8.ret指令，跳转至main
+
 .text
 .globl _idt,_gdt,_pg_dir,_tmp_floppy_area
 _pg_dir:
 startup_32:
+; 设置段寄存器（DS，ES，FS，GS等，设置为0x10）
 	movl $0x10,%eax
 	mov %ax,%ds
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
+; 设置栈段寄存器（load stack segment register）
 	lss _stack_start,%esp
 	call setup_idt
 	call setup_gdt
+; 由于段限长由8MB变为16MB，因此重设寄存器，避免8MB之后的地址受限
 	movl $0x10,%eax		# reload all the segment registers
 	mov %ax,%ds		# after changing gdt. CS was already
 	mov %ax,%es		# reloaded in 'setup_gdt'
 	mov %ax,%fs
 	mov %ax,%gs
 	lss _stack_start,%esp
+; 检测A20是否打开
 	xorl %eax,%eax
 1:	incl %eax		# check that A20 really IS enabled
 	movl %eax,0x000000	# loop forever if it isn't
@@ -42,6 +57,7 @@ startup_32:
  * 486 users probably want to set the NE (#5) bit also, so as to use
  * int 16 for math errors.
  */
+; 设置协处理器
 	movl %cr0,%eax		# check math chip
 	andl $0x80000011,%eax	# Save PG,PE,ET
 /* "orl $0x10020,%eax" here for 486 might be good */
@@ -78,6 +94,7 @@ check_x87:
  *  written by the page tables.
  */
 setup_idt:
+;  构建idt，每个中断描述符默认指向ignore_int
 	lea ignore_int,%edx
 	movl $0x00080000,%eax
 	movw %dx,%ax		/* selector = 0x0008 = cs */
@@ -105,6 +122,7 @@ rp_sidt:
  *  This routine will beoverwritten by the page tables.
  */
 setup_gdt:
+; 重设gdt，原来的gdt在setup.s中，后面会被覆盖掉
 	lgdt gdt_descr
 	ret
 
@@ -138,8 +156,10 @@ after_page_tables:
 	pushl $0		# These are the parameters to main :-)
 	pushl $0
 	pushl $0
+; main函数地址入栈，这样执行ret指令时，自动由head.s跳转至main函数执行
 	pushl $L6		# return address for main, if it decides to.
 	pushl $_main
+; 创建分页
 	jmp setup_paging
 L6:
 	jmp L6			# main should never return here, but
@@ -206,14 +226,18 @@ setup_paging:
 	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
 	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
+; 设置最后一个页表项
 	movl $pg3+4092,%edi
+; 7表示页的属性标识位，前面表示物理地址，即0xfff000
 	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
 	std
 1:	stosl			/* fill pages backwards - more efficient :-) */
 	subl $0x1000,%eax
 	jge 1b
+; 页目录基址为0x0000，将其存至CR3寄存器
 	xorl %eax,%eax		/* pg_dir is at 0x0000 */
 	movl %eax,%cr3		/* cr3 - page directory start */
+; 将CR0最高位置为1，表示分页模式开启
 	movl %cr0,%eax
 	orl $0x80000000,%eax
 	movl %eax,%cr0		/* set paging (PG) bit */
