@@ -10,6 +10,8 @@
  * NOTE!!! Startup happens at absolute address 0x00000000, which is also where
  * the page directory will exist. The startup code will be overwritten by
  * the page directory.
+ *
+ * head.s文件有25KB+184B的空间
  */
 .text
 .globl _idt,_gdt,_pg_dir,_tmp_floppy_area

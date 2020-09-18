@@ -11,7 +11,14 @@
 ! system to read them from there before the area is overwritten
 ! for buffer-blocks.
 !
-
+! setup主要作用：
+! 	1. 利用BIOS的中断服务程序读取系统数据，这些数据被放在了之前bootsect所在的位置（0x90000往后的一个扇区）
+!   2.（关中断），复制内核代码（从0x10000到0x00000），覆盖了BIOS的中断向量表
+! 	3. 设置GDT（全局描述符表）和IDT（中断描述符表）
+!   4. 打开A20（寻址从20bit到32bit）
+!   5. 对8259A（可编程中断控制器）重新编程
+!   6. 设置CPU工作模式为保护模式
+!
 ! NOTE! These had better be the same as in bootsect.s!
 
 INITSEG  = 0x9000	! we move boot here - out of the way
@@ -128,13 +135,14 @@ do_move:
 ! then we load the segment descriptors
 
 end_move:
+; 设置IDT和GDT
 	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
 	mov	ds,ax
 	lidt	idt_48		! load idt with 0,0
 	lgdt	gdt_48		! load gdt with whatever appropriate
 
 ! that was painless, now we enable A20
-
+; 打开A20寻址
 	call	empty_8042
 	mov	al,#0xD1		! command write
 	out	#0x64,al
@@ -150,7 +158,7 @@ end_move:
 ! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
 ! which is used for the internal hardware interrupts as well. We just
 ! have to reprogram the 8259's, and it isn't fun.
-
+; 重新编程8259A
 	mov	al,#0x11		! initialization sequence
 	out	#0x20,al		! send it to 8259A-1
 	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
@@ -187,10 +195,11 @@ end_move:
 ! things as simple as possible, we do no register set-up or anything,
 ! we let the gnu-compiled 32-bit programs do that. We just jump to
 ! absolute address 0x00000, in 32-bit protected mode.
-
+; 设置CPU为保护模式
 	mov	ax,#0x0001	! protected mode (PE) bit
 	lmsw	ax		! This is it!
-	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+; 8在此处并不表示第8个段，而是要查GDT，跳转至head.s
+	jmpi	0,8		! jmp offset 0 of segment 8 (cs)  
 
 ! This routine checks that the keyboard command queue is empty
 ! No timeout is used - if this hangs there is something wrong with
