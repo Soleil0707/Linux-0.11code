@@ -22,7 +22,7 @@ head.s作用：
 	5.设置协处理器（如果有）
 	6.压栈main函数入口地址
 	7.分页（一个页的页目录，4个页表，并填充其内容，即映射16MB的地址（因为当时的物理内存只有16MB））
-	8.ret指令，跳转至main
+	8.ret指令，跳转至main（此时中断还未开启）
 
 .text
 .globl _idt,_gdt,_pg_dir,_tmp_floppy_area
