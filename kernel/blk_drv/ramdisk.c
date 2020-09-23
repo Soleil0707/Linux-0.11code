@@ -48,17 +48,19 @@ void do_rd_request(void)
 
 /*
  * Returns amount of memory which needs to be reserved.
+ * @return 返回虚拟盘占用的内存空间,即传入的参数length
+ * @parms  主内存的起始位置,虚拟盘的大小	
  */
 long rd_init(long mem_start, int length)
 {
 	int	i;
 	char	*cp;
-
-	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
+	// do_rd_reques函数(DEVICE_REQUEST,虚拟盘的请求项处理函数)与blk_dev[7](请求项函数处理结构)对接
+	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;	// 之后内核可以调用do_rd_reques函数处理与虚拟盘相关的请求项操作
 	rd_start = (char *) mem_start;
 	rd_length = length;
 	cp = rd_start;
-	for (i=0; i < length; i++)
+	for (i=0; i < length; i++)	// 清空了虚拟盘所占区域
 		*cp++ = '\0';
 	return(length);
 }

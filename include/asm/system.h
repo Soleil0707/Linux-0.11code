@@ -19,6 +19,10 @@ __asm__ ("movl %%esp,%%eax\n\t" \
 
 #define iret() __asm__ ("iret"::)
 
+// 嵌入式汇编,拼接出一个中断描述符
+// gate_addr : 中断描述符IDT[n]在中断描述符表中的地址
+// dpl : 描述符特权级
+// addr : 中断服务程序的入口地址
 #define _set_gate(gate_addr,type,dpl,addr) \
 __asm__ ("movw %%dx,%%ax\n\t" \
 	"movw %0,%%dx\n\t" \

@@ -56,8 +56,8 @@ extern long startup_time;
  * This is set up by the setup-routine at boot-time
  */
 #define EXT_MEM_K (*(unsigned short *)0x90002)
-#define DRIVE_INFO (*(struct drive_info *)0x90080)
-#define ORIG_ROOT_DEV (*(unsigned short *)0x901FC)
+#define DRIVE_INFO (*(struct drive_info *)0x90080)	// 此处存放硬盘参数表	
+#define ORIG_ROOT_DEV (*(unsigned short *)0x901FC)	// 该地址存储了根设备号
 
 /*
  * Yeah, yeah, it's ugly, but I cannot find how to do this correctly
@@ -107,25 +107,28 @@ void main(void)		/* This really IS void, no error here. */
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
- 	ROOT_DEV = ORIG_ROOT_DEV;
- 	drive_info = DRIVE_INFO;
-	memory_end = (1<<20) + (EXT_MEM_K<<10);
-	memory_end &= 0xfffff000;
-	if (memory_end > 16*1024*1024)
+// 此时仍处于关中断的状态
+ 	ROOT_DEV = ORIG_ROOT_DEV;   // 根设备为软盘
+ 	drive_info = DRIVE_INFO;    // 硬盘信息
+// 接下来开始规划物理内存,包括了缓冲区,虚拟盘,主内存(还有一部分存放了内核的代码和数据,在地址0往后的一部分空间,这部分不做其他规划)
+// 整个结构为:内核代码,内核数据,缓冲区,虚拟盘,主内存
+	memory_end = (1<<20) + (EXT_MEM_K<<10); // 内存总量,单位是字节
+	memory_end &= 0xfffff000;               // 页对齐,忽略不足一页的内存量
+	if (memory_end > 16*1024*1024)          // 如果内存大于16MB(物理内存),则以16MB计
 		memory_end = 16*1024*1024;
-	if (memory_end > 12*1024*1024) 
+	if (memory_end > 12*1024*1024)          // 如果内存大于12MB,设置缓冲区为4MB
 		buffer_memory_end = 4*1024*1024;
-	else if (memory_end > 6*1024*1024)
+	else if (memory_end > 6*1024*1024)      // 如果内存介于6MB-12MB,设置缓冲区为2MB
 		buffer_memory_end = 2*1024*1024;
-	else
+	else                                    // 如果内存小于1MB,设置缓冲区为1MB
 		buffer_memory_end = 1*1024*1024;
-	main_memory_start = buffer_memory_end;
-#ifdef RAMDISK
-	main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
+	main_memory_start = buffer_memory_end;  // 缓冲区之后即为主内存
+#ifdef RAMDISK                              // 如果定义了虚拟盘,RAMDISK在makefile中被定义
+	main_memory_start += rd_init(main_memory_start, RAMDISK*1024);  // 挂接虚拟盘请求项函数,清空虚拟盘区域
 #endif
-	mem_init(main_memory_start,memory_end);
-	trap_init();
-	blk_dev_init();
+	mem_init(main_memory_start,memory_end); //初始化主内存,规划了主内存区的页面使用次数
+	trap_init();    // 将中断处理服务程序与IDT挂接,重建中断服务体系
+	blk_dev_init(); // 初始化块设备请求项
 	chr_dev_init();
 	tty_init();
 	time_init();
