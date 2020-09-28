@@ -405,11 +405,11 @@ void mem_init(long start_mem, long end_mem)
 
 	HIGH_MEMORY = end_mem;
 	for (i=0 ; i<PAGING_PAGES ; i++)
-		mem_map[i] = USED;	// mem_map结构记录从主内存的1MB起始往后的15MB,每个页的使用次数(页框的使用次数)
-	// TODO: 此处MAP_NR将i设置为了多少,不明白
-	i = MAP_NR(start_mem);	// 重复利用变量i,
+		mem_map[i] = USED;	// mem_map结构记录从内存的1MB起始往后的15MB,每个页的引用次数(页框的引用次数)
+	//页号从内存的1MB开始算起，即1MB处的页号为0
+	i = MAP_NR(start_mem);	// 重复利用变量i,计算此时主内存的起始页号
 	end_mem -= start_mem;	
-	end_mem >>= 12;			// 主内存区总的页数(算上了前1MB)
+	end_mem >>= 12;			// 主内存区总的页数(不算前1MB)
 	while (end_mem-->0)
 		mem_map[i++]=0;
 }

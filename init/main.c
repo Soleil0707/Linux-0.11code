@@ -112,7 +112,7 @@ void main(void)		/* This really IS void, no error here. */
  	drive_info = DRIVE_INFO;    // 硬盘信息
 // 接下来开始规划物理内存,包括了缓冲区,虚拟盘,主内存(还有一部分存放了内核的代码和数据,在地址0往后的一部分空间,这部分不做其他规划)
 // 整个结构为:内核代码,内核数据,缓冲区,虚拟盘,主内存
-	memory_end = (1<<20) + (EXT_MEM_K<<10); // 内存总量,单位是字节
+	memory_end = (1<<20) + (EXT_MEM_K<<10); // 内存总量,单位是字节，操作系统自带了1MB
 	memory_end &= 0xfffff000;               // 页对齐,忽略不足一页的内存量
 	if (memory_end > 16*1024*1024)          // 如果内存大于16MB(物理内存),则以16MB计
 		memory_end = 16*1024*1024;
@@ -128,15 +128,15 @@ void main(void)		/* This really IS void, no error here. */
 #endif
 	mem_init(main_memory_start,memory_end); //初始化主内存,规划了主内存区的页面使用次数
 	trap_init();    // 将中断处理服务程序与IDT挂接,重建中断服务体系
-	blk_dev_init(); // 初始化块设备请求项
-	chr_dev_init();
-	tty_init();
-	time_init();
-	sched_init();
+	blk_dev_init(); // 初始化块设备请求项，一共32个，但还未与具体设备挂接
+	chr_dev_init();	// 空函数，本来是用来初始化字符设备的
+	tty_init();		// 真正用来初始化字符设备的，teletype初始化
+	time_init();	// 开机启动时间
+	sched_init();	// 初始化进程0
 	buffer_init(buffer_memory_end);
 	hd_init();
 	floppy_init();
-	sti();
+	sti();			// 开启中断
 	move_to_user_mode();
 	if (!fork()) {		/* we count on this going ok */
 		init();

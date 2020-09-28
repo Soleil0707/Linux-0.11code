@@ -33,14 +33,14 @@ static void init(int port)
 	outb_p(0x0d,port+1);	/* enable all intrs but writes */
 	(void)inb(port);	/* read data port to reset things (?) */
 }
-
+// 设置串行口
 void rs_init(void)
 {
-	set_intr_gate(0x24,rs1_interrupt);
-	set_intr_gate(0x23,rs2_interrupt);
-	init(tty_table[1].read_q.data);
-	init(tty_table[2].read_q.data);
-	outb(inb_p(0x21)&0xE7,0x21);
+	set_intr_gate(0x24,rs1_interrupt);	// 设置串行口1的中断
+	set_intr_gate(0x23,rs2_interrupt);	// 设置串行口2的中断
+	init(tty_table[1].read_q.data);		// 初始化串行口1
+	init(tty_table[2].read_q.data);		// 初始化串行口2
+	outb(inb_p(0x21)&0xE7,0x21);		// 允许8259A的IRQ3和IRQ4发送中断请求
 }
 
 /*
