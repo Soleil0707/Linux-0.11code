@@ -347,15 +347,17 @@ struct buffer_head * breada(int dev,int first, ...)
 
 void buffer_init(long buffer_end)
 {
-	struct buffer_head * h = start_buffer;
+	struct buffer_head * h = start_buffer;	// 内核的末端，缓冲区的起始
 	void * b;
 	int i;
-
+	// 确定缓冲区末尾，也是缓冲区的起始位置
 	if (buffer_end == 1<<20)
 		b = (void *) (640*1024);
 	else
 		b = (void *) buffer_end;
+	// 一个缓冲区块是1K，区块头和区块反方向增长
 	while ( (b -= BLOCK_SIZE) >= ((void *) (h+1)) ) {
+		// 头节点记录对应缓冲块的挂接设备号，是否为脏，引用次数，是否锁定
 		h->b_dev = 0;
 		h->b_dirt = 0;
 		h->b_count = 0;
@@ -364,8 +366,8 @@ void buffer_init(long buffer_end)
 		h->b_wait = NULL;
 		h->b_next = NULL;
 		h->b_prev = NULL;
-		h->b_data = (char *) b;
-		h->b_prev_free = h-1;
+		h->b_data = (char *) b;	// 标记对应的缓冲区块
+		h->b_prev_free = h-1;	// 头结点链接成为环双向链表
 		h->b_next_free = h+1;
 		h++;
 		NR_BUFFERS++;
@@ -376,6 +378,6 @@ void buffer_init(long buffer_end)
 	free_list = start_buffer;
 	free_list->b_prev_free = h;
 	h->b_next_free = free_list;
-	for (i=0;i<NR_HASH;i++)
+	for (i=0;i<NR_HASH;i++)	
 		hash_table[i]=NULL;
 }	

@@ -133,11 +133,11 @@ void main(void)		/* This really IS void, no error here. */
 	tty_init();		// 真正用来初始化字符设备的，teletype初始化
 	time_init();	// 开机启动时间
 	sched_init();	// 初始化进程0
-	buffer_init(buffer_memory_end);
-	hd_init();
-	floppy_init();
-	sti();			// 开启中断
-	move_to_user_mode();
+	buffer_init(buffer_memory_end);	// 初始化缓冲区
+	hd_init();	// 初始化硬盘
+	floppy_init();	// 初始化软盘，类似于硬盘
+	sti();			// 开启中断，EFLAGS寄存器中的IF置为1，表示允许中断
+	move_to_user_mode();	// 特权级翻转，由0至3
 	if (!fork()) {		/* we count on this going ok */
 		init();
 	}
