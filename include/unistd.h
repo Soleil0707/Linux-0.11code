@@ -135,8 +135,9 @@ type name(void) \
 { \
 long __res; \
 __asm__ volatile ("int $0x80" \
-	: "=a" (__res) \
-	: "0" (__NR_##name)); \
+	: "=a" (__res) \	//输出，将_res接受eax的值
+	: "0" (__NR_##name)); \	//输入，0表示同上，即eax，在系统调用fork中，该参数是2，即2赋值给eax
+	// 此时开始进入系统调用，在硬件中执行，硬件将自动压栈寄存器：SS ESP EFLAGS CS EIP，此处看不到代码
 if (__res >= 0) \
 	return (type) __res; \
 errno = -__res; \

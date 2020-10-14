@@ -29,7 +29,7 @@
  *	28(%esp) - %oldesp
  *	2C(%esp) - %oldss
  */
-
+; 此函数与系统调用相关，记录了系统调用的中断处理函数
 SIG_CHLD	= 17
 
 EAX		= 0x00
@@ -62,7 +62,7 @@ nr_system_calls = 72
 
 /*
  * Ok, I get parallel printer interrupts while using the floppy for some
- * strange reason. Urgel. Now I just ignore them.
+ * strange reason. Urgel. Now I just ignore them.WEW
  */
 .globl _system_call,_sys_fork,_timer_interrupt,_sys_execve
 .globl _hd_interrupt,_floppy_interrupt,_parallel_interrupt
@@ -74,13 +74,15 @@ bad_sys_call:
 	iret
 .align 2
 reschedule:
-	pushl $ret_from_sys_call
+	pushl $ret_from_sys_call	
 	jmp _schedule
+
+# TODO: 系统调用函数
 .align 2
 _system_call:
-	cmpl $nr_system_calls-1,%eax
+	cmpl $nr_system_calls-1,%eax	# 检查系统调用参数是否合法
 	ja bad_sys_call
-	push %ds
+	push %ds	# 压栈ds es fs edx ecx ebx
 	push %es
 	push %fs
 	pushl %edx
@@ -91,7 +93,7 @@ _system_call:
 	mov %dx,%es
 	movl $0x17,%edx		# fs points to local data space
 	mov %dx,%fs
-	call _sys_call_table(,%eax,4)
+	call _sys_call_table(,%eax,4)	# 根据相关参数，查阅调用表，找到具体的调用函数，比如fork函数，进而跳转开始执行。该指令也会存在压栈保护现场，后续作为copy_process的参数
 	pushl %eax
 	movl _current,%eax
 	cmpl $0,state(%eax)		# state
@@ -204,16 +206,17 @@ _sys_execve:
 	addl $4,%esp
 	ret
 
+# 系统调用，fork函数
 .align 2
 _sys_fork:
 	call _find_empty_process
-	testl %eax,%eax
+	testl %eax,%eax	# 此处测试了64个进程是否已满，如果满则跳转
 	js 1f
 	push %gs
 	pushl %esi
 	pushl %edi
 	pushl %ebp
-	pushl %eax
+	pushl %eax	# 5个push，作为copy_process的参数（前面还push了12个，_sys_call中有6个）
 	call _copy_process
 	addl $20,%esp
 1:	ret

@@ -138,7 +138,7 @@ void main(void)		/* This really IS void, no error here. */
 	floppy_init();	// 初始化软盘，类似于硬盘
 	sti();			// 开启中断，EFLAGS寄存器中的IF置为1，表示允许中断
 	move_to_user_mode();	// 特权级翻转，由0至3
-	if (!fork()) {		/* we count on this going ok */
+	if (!fork()) {		/* we count on this going ok */ //这一行创建了进程1
 		init();
 	}
 /*

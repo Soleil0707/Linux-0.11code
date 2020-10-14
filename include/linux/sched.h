@@ -48,7 +48,7 @@ struct i387_struct {
 	long	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
 };
 
-struct tss_struct {
+struct tss_struct { //104B
 	long	back_link;	/* 16 high bits zero */
 	long	esp0;
 	long	ss0;		/* 16 high bits zero */

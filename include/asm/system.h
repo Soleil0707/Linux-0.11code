@@ -1,10 +1,10 @@
-#define move_to_user_mode() \
+#define 	move_to_user_mode() \
 __asm__ ("movl %%esp,%%eax\n\t" \
-	"pushl $0x17\n\t" \
-	"pushl %%eax\n\t" \
-	"pushfl\n\t" \
-	"pushl $0x0f\n\t" \
-	"pushl $1f\n\t" \
+	"pushl $0x17\n\t" \				// SS寄存器：10 1 11 , 3特权级，LDT的第2项（0项：空，1项：代码段，2项：数据段）
+	"pushl %%eax\n\t" \				// esp
+	"pushfl\n\t" \					// eflags寄存器
+	"pushl $0x0f\n\t" \				// CS寄存器（存储段选择子）：01 1 11 , 3特权级，LDT的第1项，即代码段
+	"pushl $1f\n\t" \				// EIP寄存器，此时push进入的是进程0的用户栈，但此时处于0特权级，但iret后，会自然变成用户栈
 	"iret\n" \
 	"1:\tmovl $0x17,%%eax\n\t" \
 	"movw %%ax,%%ds\n\t" \

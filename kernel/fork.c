@@ -35,24 +35,27 @@ void verify_area(void * addr,int size)
 		start += 4096;
 	}
 }
-
+// 根据进程0的代码段、数据段，设置进程1的代码段、数据段
+// TODO: 这里使用的地址均为线性地址
 int copy_mem(int nr,struct task_struct * p)
 {
 	unsigned long old_data_base,new_data_base,data_limit;
 	unsigned long old_code_base,new_code_base,code_limit;
 
-	code_limit=get_limit(0x0f);
-	data_limit=get_limit(0x17);
-	old_code_base = get_base(current->ldt[1]);
+	code_limit=get_limit(0x0f);	// 01 1 11，3特权级、LDT、第2项，即当前进程（进程0）的LDT中的代码段的段选择子，依据此可以找到当前段的限长
+	data_limit=get_limit(0x17);	// 10 1 11，3特权级、LDT、第3项
+	old_code_base = get_base(current->ldt[1]);	// 段基址,其实是进程空间的基址（对于进程0而言，应该是0）
 	old_data_base = get_base(current->ldt[2]);
-	if (old_data_base != old_code_base)
+	if (old_data_base != old_code_base)	//必须是同一个LDT的数据段和代码段
 		panic("We don't support separate I&D");
 	if (data_limit < code_limit)
 		panic("Bad data_limit");
-	new_data_base = new_code_base = nr * 0x4000000;
+	new_data_base = new_code_base = nr * 0x4000000;	// 每个进程64MB的线性地址空间，0x0-0x3ffffff，0x4000000-0x7ffffff是进程1的空间
 	p->start_code = new_code_base;
+	// 设置新进程的代码段、数据段的段基址
 	set_base(p->ldt[1],new_code_base);
 	set_base(p->ldt[2],new_data_base);
+	// 创建进程1的页表，复制进程0的页表（160个页表项。总计640KB），设置进程1的页目录项
 	if (copy_page_tables(old_data_base,new_data_base,data_limit)) {
 		free_page_tables(new_data_base,data_limit);
 		return -ENOMEM;
@@ -74,11 +77,12 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	int i;
 	struct file *f;
 
-	p = (struct task_struct *) get_free_page();
+	p = (struct task_struct *) get_free_page(); //申请一个页，用于进程1的task_struct和内核栈，页面已经清零、返回的是物理地址
+	// TODO: 这里验证了每个进程都一个内核栈
 	if (!p)
 		return -EAGAIN;
-	task[nr] = p;
-	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
+	task[nr] = p;	//进程1与task数组挂接，此时nr的值应该是1，意味着可以被调度了
+	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */	//这一行将进程0的task_struct完全拷贝给进程1，但内核栈没有拷贝，因为内核栈处于页的末端
 	p->state = TASK_UNINTERRUPTIBLE;
 	p->pid = last_pid;
 	p->father = current->pid;
@@ -90,9 +94,9 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->cutime = p->cstime = 0;
 	p->start_time = jiffies;
 	p->tss.back_link = 0;
-	p->tss.esp0 = PAGE_SIZE + (long) p;
-	p->tss.ss0 = 0x10;
-	p->tss.eip = eip;
+	p->tss.esp0 = PAGE_SIZE + (long) p;		// 内核栈指针的位置，即该页面的尾端
+	p->tss.ss0 = 0x10;	// 10000
+	p->tss.eip = eip;						// 这行与下一行控制进程1开始运行时执行的代码
 	p->tss.eflags = eflags;
 	p->tss.eax = 0;
 	p->tss.ecx = ecx;
@@ -108,7 +112,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->tss.ds = ds & 0xffff;
 	p->tss.fs = fs & 0xffff;
 	p->tss.gs = gs & 0xffff;
-	p->tss.ldt = _LDT(nr);
+	p->tss.ldt = _LDT(nr);	// 进程1的LDT与LDT表进行挂接
 	p->tss.trace_bitmap = 0x80000000;
 	if (last_task_used_math == current)
 		__asm__("clts ; fnsave %0"::"m" (p->tss.i387));

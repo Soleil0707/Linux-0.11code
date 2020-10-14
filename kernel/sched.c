@@ -69,7 +69,7 @@ long user_stack [ PAGE_SIZE>>2 ] ;
 struct {
 	long * a;
 	short b;
-	} stack_start = { & user_stack [PAGE_SIZE>>2] , 0x10 };
+	} stack_start = { & user_stack [PAGE_SIZE>>2] , 0x10 }; // TODO: 之所以叫user，是后面和进程0的用户栈关联上了（move_to_user_mode函数）
 /*
  *  'math_state_restore()' saves the current math information in the
  * old math state array, and gets the new ones from the current task
@@ -402,7 +402,7 @@ void sched_init(void)
 /* Clear NT, so that we won't have troubles with that later on */
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
 	ltr(0);		// TR寄存器指向tss0
-	lldt(0);	// LDTR寄存器指向LDT0（CPU可通过这两个寄存器找到进程0）
+	lldt(0);	// LDTR寄存器指向LDT0（CPU可通过这两个寄存器找到进程0），标志着此时CPU认为进程0是当前运行进程
 	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */

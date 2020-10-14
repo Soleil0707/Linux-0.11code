@@ -60,6 +60,9 @@ static unsigned char mem_map [ PAGING_PAGES ] = {0,};
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
  */
+// 申请一个页，声明为已使用(mem_map数组)
+// 该函数从主内存的最末端开始，向前循环查找空白页
+// TODO: 页面清零,返回的是物理地址
 unsigned long get_free_page(void)
 {
 register unsigned long __res asm("ax");
@@ -67,16 +70,16 @@ register unsigned long __res asm("ax");
 __asm__("std ; repne ; scasb\n\t"
 	"jne 1f\n\t"
 	"movb $1,1(%%edi)\n\t"
-	"sall $12,%%ecx\n\t"
-	"addl %2,%%ecx\n\t"
+	"sall $12,%%ecx\n\t"				// 空白页的相对起始地址
+	"addl %2,%%ecx\n\t"					// 加上低端物理地址，得到了空白页的物理起始地址
 	"movl %%ecx,%%edx\n\t"
 	"movl $1024,%%ecx\n\t"
 	"leal 4092(%%edx),%%edi\n\t"
-	"rep ; stosl\n\t"
-	"movl %%edx,%%eax\n"
+	"rep ; stosl\n\t"					// 讲该页面清零
+	"movl %%edx,%%eax\n"				// 函数返回值（空白页的物理地址）
 	"1:"
-	:"=a" (__res)
-	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
+	:"=a" (__res)								// 输出
+	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),	// 输入
 	"D" (mem_map+PAGING_PAGES-1)
 	:"di","cx","dx");
 return __res;
@@ -146,6 +149,10 @@ int free_page_tables(unsigned long from,unsigned long size)
  * doesn't take any more memory - we don't copy-on-write in the low
  * 1 Mb-range, so the pages can be shared with the kernel. Thus the
  * special case for nr=xxxx.
+ * 
+ * 页查找规则：页目录项 页表项 页
+ * 传入的地址为线性地址
+ * 这个函数是用来拷贝页表的，不是用来拷贝页表对应页的数据的
  */
 int copy_page_tables(unsigned long from,unsigned long to,long size)
 {
@@ -154,12 +161,18 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	unsigned long this_page;
 	unsigned long * from_dir, * to_dir;
 	unsigned long nr;
-
+	// 0x3fffff是一个4MB（22bit），即一个页表的1024个页表项所能管辖的地址范围，这样保证了复制时就是一个页表的全部内容
+	// TODO: 从这里可以推断出，一个进程有64MB的空间，即需要16个页表页才能全部管辖
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
+	// 得到了页目录项的内容（页表的起始地址）
+	// TODO: 这里只右移20位，是因为一个页目录对应一个页表，也即是4MB的地址空间，这是22位，而一个页目录占4个字节，所以再减去2位，得到了起始页目录项的内容
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
+	// 单位是4MB，得到的是需要拷贝多少个4MB，即多少个页表，也就是多少个页目录项（+0x3fffff是为了得到整数倍的值）
 	size = ((unsigned) (size+0x3fffff)) >> 22;
+	// 开始复制页表，循环进行的次数就是页目录的项数
+	// from_dir++ 就是下一个页表的起始地址
 	for( ; size-->0 ; from_dir++,to_dir++) {
 		if (1 & *to_dir)
 			panic("copy_page_tables: already exist");
