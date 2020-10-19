@@ -93,17 +93,17 @@ _system_call:
 	mov %dx,%es
 	movl $0x17,%edx		# fs points to local data space
 	mov %dx,%fs
-	call _sys_call_table(,%eax,4)	# 根据相关参数，查阅调用表，找到具体的调用函数，比如fork函数，进而跳转开始执行。该指令也会存在压栈保护现场，后续作为copy_process的参数
-	pushl %eax
+	call _sys_call_table(,%eax,4)	# 根据相关参数，查阅调用表，找到具体的调用函数，比如fork函数，进而跳转开始执行。该指令也会存在压栈保护现场，后续作为copy_process的参数；第一次系统调用，此处为pause的参数
+	pushl %eax				# 从sys_fork返回，返回值为进程id
 	movl _current,%eax
-	cmpl $0,state(%eax)		# state
+	cmpl $0,state(%eax)		# state	当前进程是否为就绪态，不是就绪态就跳转调度
 	jne reschedule
-	cmpl $0,counter(%eax)		# counter
+	cmpl $0,counter(%eax)		# counter	当前进程时间片是否用尽，用尽就跳转调度
 	je reschedule
 ret_from_sys_call:
 	movl _current,%eax		# task[0] cannot have signals
 	cmpl _task,%eax
-	je 3f
+	je 3f	# 如果是进程0，就跳转到3f
 	cmpw $0x0f,CS(%esp)		# was old code segment supervisor ?
 	jne 3f
 	cmpw $0x17,OLDSS(%esp)		# was stack segment = 0x17 ?
@@ -120,14 +120,14 @@ ret_from_sys_call:
 	pushl %ecx
 	call _do_signal
 	popl %eax
-3:	popl %eax
+3:	popl %eax	# 还原压栈的寄存器值，对应85行之后的压栈
 	popl %ebx
 	popl %ecx
 	popl %edx
 	pop %fs
 	pop %es
 	pop %ds
-	iret
+	iret	# 中断返回，ss、esp、eflags、cs、eip的值依然由硬件出栈，然后翻转特权级
 
 .align 2
 _coprocessor_error:
@@ -217,8 +217,8 @@ _sys_fork:
 	pushl %edi
 	pushl %ebp
 	pushl %eax	# 5个push，作为copy_process的参数（前面还push了12个，_sys_call中有6个）
-	call _copy_process
-	addl $20,%esp
+	call _copy_process	# copy_process函数返回进程id，存入eax
+	addl $20,%esp	# 清空栈顶的五个寄存器值，即'call _copy_process'上面的五个
 1:	ret
 
 _hd_interrupt:

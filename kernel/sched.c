@@ -141,9 +141,12 @@ void schedule(void)
 	switch_to(next);
 }
 
+// 系统调用，进程暂停，进程调度
 int sys_pause(void)
 {
-	current->state = TASK_INTERRUPTIBLE;
+	// 当前进程变为可中断等待状态、中断或者其他进程的信号可将其状态变为就绪态（等待被调用）
+	current->state = TASK_INTERRUPTIBLE;	
+	// 进行一次进程调度
 	schedule();
 	return 0;
 }

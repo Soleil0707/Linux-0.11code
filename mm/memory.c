@@ -163,41 +163,41 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	unsigned long nr;
 	// 0x3fffff是一个4MB（22bit），即一个页表的1024个页表项所能管辖的地址范围，这样保证了复制时就是一个页表的全部内容
 	// TODO: 从这里可以推断出，一个进程有64MB的空间，即需要16个页表页才能全部管辖
-	if ((from&0x3fffff) || (to&0x3fffff))
+	if ((from&0x3fffff) || (to&0x3fffff))	// 源与目的都必须4M对齐
 		panic("copy_page_tables called with wrong alignment");
 	// 得到了页目录项的内容（页表的起始地址）
-	// TODO: 这里只右移20位，是因为一个页目录对应一个页表，也即是4MB的地址空间，这是22位，而一个页目录占4个字节，所以再减去2位，得到了起始页目录项的内容
+	// TODO: 这里只右移20位，是因为一个页目录对应一个页表，也即是4MB的地址空间，这是22位，而一个页目录占4个字节，所以再减去2位，得到了页目录项的地址
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
 	// 单位是4MB，得到的是需要拷贝多少个4MB，即多少个页表，也就是多少个页目录项（+0x3fffff是为了得到整数倍的值）
 	size = ((unsigned) (size+0x3fffff)) >> 22;
-	// 开始复制页表，循环进行的次数就是页目录的项数
+	// 开始复制页表，循环进行的次数就是页目录的项数，每次循环拷贝一个页表
 	// from_dir++ 就是下一个页表的起始地址
 	for( ; size-->0 ; from_dir++,to_dir++) {
-		if (1 & *to_dir)
+		if (1 & *to_dir)	// 目的页目录表项存在（也即是对应页表已存在），则panic
 			panic("copy_page_tables: already exist");
-		if (!(1 & *from_dir))
+		if (!(1 & *from_dir))	// 如果源页目录表项不存在（也即是对应页表不存在），则跳过此次循环
 			continue;
-		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);
-		if (!(to_page_table = (unsigned long *) get_free_page()))
+		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);	// 页目录项的内容就是页表的起始地址
+		if (!(to_page_table = (unsigned long *) get_free_page()))	// 申请一个空页，用于存储子进程的页表
 			return -1;	/* Out of memory, see freeing */
 		*to_dir = ((unsigned long) to_page_table) | 7;
-		nr = (from==0)?0xA0:1024;
-		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {
-			this_page = *from_page_table;
+		nr = (from==0)?0xA0:1024;	//如果是第一个页表，只复制前160项（一个页表项控制4KB的页，160*4=640KB，正好是进程0的全部内存空间）
+		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {	// 循环一次，就对应一个页表项
+			this_page = *from_page_table;	// 通过页表项的值，得到页的起始地址
 			if (!(1 & this_page))
 				continue;
-			this_page &= ~2;
+			this_page &= ~2;	// 页的属性 101表示用户、只读、存在
 			*to_page_table = this_page;
 			if (this_page > LOW_MEM) {
 				*from_page_table = this_page;
 				this_page -= LOW_MEM;
 				this_page >>= 12;
-				mem_map[this_page]++;
+				mem_map[this_page]++;	// mem_map只记录1MB以上的页的引用情况（1MB以内是内核区）
 			}
 		}
 	}
-	invalidate();
+	invalidate();	// 重置CR3，页目录基址寄存器，刷新TLB
 	return 0;
 }
 

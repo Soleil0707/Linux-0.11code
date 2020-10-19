@@ -85,7 +85,7 @@ struct task_struct {
 	long blocked;	/* bitmap of masked signals */
 /* various fields */
 	int exit_code;
-	unsigned long start_code,end_code,end_data,brk,start_stack;
+	unsigned long start_code,end_code,end_data,brk,start_stack;//start_code有特殊含义
 	long pid,father,pgrp,session,leader;
 	unsigned short uid,euid,suid;
 	unsigned short gid,egid,sgid;
@@ -109,6 +109,7 @@ struct task_struct {
 /*
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x9ffff (=640kB)
+ * TODO: 进程0的初始化的值在这里
  */
 #define INIT_TASK \
 /* state etc */	{ 0,15,15, \
@@ -225,6 +226,7 @@ __base;})
 
 #define get_base(ldt) _get_base( ((char *)&(ldt)) )
 
+// lsl:load segment limit
 #define get_limit(segment) ({ \
 unsigned long __limit; \
 __asm__("lsll %1,%0\n\tincl %0":"=r" (__limit):"r" (segment)); \

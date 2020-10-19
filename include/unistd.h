@@ -139,7 +139,7 @@ __asm__ volatile ("int $0x80" \
 	: "0" (__NR_##name)); \	//输入，0表示同上，即eax，在系统调用fork中，该参数是2，即2赋值给eax
 	// 此时开始进入系统调用，在硬件中执行，硬件将自动压栈寄存器：SS ESP EFLAGS CS EIP，此处看不到代码
 if (__res >= 0) \
-	return (type) __res; \
+	return (type) __res; \		//系统调用fork函数，在此处返回（返回的是创建的子进程id）
 errno = -__res; \
 return -1; \
 }

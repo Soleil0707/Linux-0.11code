@@ -42,7 +42,7 @@ int copy_mem(int nr,struct task_struct * p)
 	unsigned long old_data_base,new_data_base,data_limit;
 	unsigned long old_code_base,new_code_base,code_limit;
 
-	code_limit=get_limit(0x0f);	// 01 1 11，3特权级、LDT、第2项，即当前进程（进程0）的LDT中的代码段的段选择子，依据此可以找到当前段的限长
+	code_limit=get_limit(0x0f);	// 01 1 11，3特权级、LDT、第2项，即当前进程（进程0）的LDT中的代码段的段选择子，依据此可以找到当前段的限长(值为640K)
 	data_limit=get_limit(0x17);	// 10 1 11，3特权级、LDT、第3项
 	old_code_base = get_base(current->ldt[1]);	// 段基址,其实是进程空间的基址（对于进程0而言，应该是0）
 	old_data_base = get_base(current->ldt[2]);
@@ -50,7 +50,7 @@ int copy_mem(int nr,struct task_struct * p)
 		panic("We don't support separate I&D");
 	if (data_limit < code_limit)
 		panic("Bad data_limit");
-	new_data_base = new_code_base = nr * 0x4000000;	// 每个进程64MB的线性地址空间，0x0-0x3ffffff，0x4000000-0x7ffffff是进程1的空间
+	new_data_base = new_code_base = nr * 0x4000000;	// 每个进程64MB的线性地址空间（4GB分给64个进程），0x0-0x3ffffff，0x4000000-0x7ffffff是进程1的空间
 	p->start_code = new_code_base;
 	// 设置新进程的代码段、数据段的段基址
 	set_base(p->ldt[1],new_code_base);
@@ -98,7 +98,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->tss.ss0 = 0x10;	// 10000
 	p->tss.eip = eip;						// 这行与下一行控制进程1开始运行时执行的代码
 	p->tss.eflags = eflags;
-	p->tss.eax = 0;
+	p->tss.eax = 0;							// 写死为0，作为返回地址
 	p->tss.ecx = ecx;
 	p->tss.edx = edx;
 	p->tss.ebx = ebx;
@@ -121,17 +121,20 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 		free_page((long) p);
 		return -EAGAIN;
 	}
+	// 进程1共享进程0的文件
 	for (i=0; i<NR_OPEN;i++)
 		if (f=p->filp[i])
 			f->f_count++;
-	if (current->pwd)
+	if (current->pwd)	// 当前目录的i节点(对于进程0而言，这些都是空的，所有进程1的也是空的)
 		current->pwd->i_count++;
-	if (current->root)
+	if (current->root)	// 根目录的i节点
 		current->root->i_count++;
-	if (current->executable)
+	if (current->executable)	// 执行文件的i节点
 		current->executable->i_count++;
+	// 进程1的ldt、tss挂载到GDT上（GDT布局：NULL、内核CS、内核DS、NULL、TSS0、LDT0、TSS1、LDT1...）
 	set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));
 	set_ldt_desc(gdt+(nr<<1)+FIRST_LDT_ENTRY,&(p->ldt));
+	// 设置为就绪态、可以调度了
 	p->state = TASK_RUNNING;	/* do this last, just in case */
 	return last_pid;
 }

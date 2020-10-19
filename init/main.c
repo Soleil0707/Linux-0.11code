@@ -148,7 +148,8 @@ void main(void)		/* This really IS void, no error here. */
  * can run). For task0 'pause()' just means we go check if some other
  * task can run, and if not we return here.
  */
-	for(;;) pause();
+	// 此时进程1创建完成、正在运行进程0
+	for(;;) pause();	// pause函数为系统调用，进程0主动让出CPU
 }
 
 static int printf(const char *fmt, ...)
