@@ -149,6 +149,8 @@ void main(void)		/* This really IS void, no error here. */
  * task can run, and if not we return here.
  */
 	// 此时进程1创建完成、正在运行进程0
+	// TODO: 当进程1读硬盘时，进程0会反复执行这一函数，而这一执行不再是进程0切换到进程0，而是直接返回
+	// TODO: 直至进程1产生了硬盘中断，进程0结束执行，转为进程1执行
 	for(;;) pause();	// pause函数为系统调用，进程0主动让出CPU
 }
 

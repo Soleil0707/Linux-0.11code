@@ -120,8 +120,11 @@ void schedule(void)
 		}
 
 /* this is the scheduler proper: */
-
+	// 第二次遍历task数组,寻找可以调度的进程
+	// TODO: 当前函数第一次执行从进程0切换到进程1(此时进程0因为系统调用pause变为可中断的等待状态)
+	// TODO: 第二次从进程1调度,因为进程1为不可中断等待,进程0为可中断的等待状态,不存在就绪态的进程,因此会强制执行进程0
 	while (1) {
+		// TODO: c的默认值为-1,next默认值为0,因此如果找不到需要调度的进程,就去强制执行进程0
 		c = -1;
 		next = 0;
 		i = NR_TASKS;
@@ -161,6 +164,7 @@ void sleep_on(struct task_struct **p)
 		panic("task[0] trying to sleep");
 	tmp = *p;
 	*p = current;
+	// 当前进程变为不可中断的等待模式,不可被时钟中断调度,但可以通过其他方式调度
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule();
 	if (tmp)

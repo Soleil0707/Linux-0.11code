@@ -193,7 +193,9 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 		panic("Trying to write bad sector");
 	if (!controller_ready())
 		panic("HD controller not ready");
+	// 读或写的中断服务程序地址
 	do_hd = intr_addr;
+	// 下达指令，开始读盘
 	outb_p(hd_info[drive].ctl,HD_CMD);
 	port=HD_DATA;
 	outb_p(hd_info[drive].wpcom>>2,++port);
@@ -296,7 +298,7 @@ static void recal_intr(void)
 		bad_rw_intr();
 	do_hd_request();
 }
-
+// 硬盘请求项函数
 void do_hd_request(void)
 {
 	int i,r;
@@ -311,6 +313,7 @@ void do_hd_request(void)
 		end_request(0);
 		goto repeat;
 	}
+
 	block += hd[dev].start_sect;
 	dev /= 5;
 	__asm__("divl %4":"=a" (block),"=d" (sec):"0" (block),"1" (0),
@@ -331,6 +334,7 @@ void do_hd_request(void)
 			WIN_RESTORE,&recal_intr);
 		return;
 	}	
+	// 当前请求如果是写请求
 	if (CURRENT->cmd == WRITE) {
 		hd_out(dev,nsect,sec,head,cyl,WIN_WRITE,&write_intr);
 		for(i=0 ; i<3000 && !(r=inb_p(HD_STATUS)&DRQ_STAT) ; i++)
@@ -340,7 +344,9 @@ void do_hd_request(void)
 			goto repeat;
 		}
 		port_write(HD_DATA,CURRENT->buffer,256);
+	// 当前请求如果是读请求
 	} else if (CURRENT->cmd == READ) {
+		// WIN_READ表示是读操作，read_intr对应的是硬盘读的中断服务程序
 		hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr);
 	} else
 		panic("unknown hd-command");

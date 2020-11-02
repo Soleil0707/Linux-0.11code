@@ -35,7 +35,7 @@ int NR_BUFFERS = 0;
 
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
-	// TODO: 此处关中断是为什么
+	// TODO: 关中断表示不再允许时钟中断了，但是此时可以主动让出CPU给其他进程
 	cli();
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait);
@@ -293,8 +293,9 @@ struct buffer_head * bread(int dev,int block)
 		panic("bread: getblk returned NULL\n");
 	if (bh->b_uptodate)	// 申请的缓冲块需要更新
 		return bh;
-	
+	// 该函数执行完后，请求项直接开始执行，开始读引导块
 	ll_rw_block(READ,bh);
+	// 挂起等待引导块被读完，然后再继续处理引导块,此时会发生进程切换
 	wait_on_buffer(bh);
 	if (bh->b_uptodate)
 		return bh;

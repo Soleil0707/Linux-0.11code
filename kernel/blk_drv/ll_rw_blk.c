@@ -70,17 +70,23 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 	cli();
 	if (req->bh)
 		req->bh->b_dirt = 0;
+	// 如果当前没有请求，则进入if执行
 	if (!(tmp = dev->current_request)) {
+		// 设为当前执行请求，然后开中断调用硬盘请求项处理函数去执行
 		dev->current_request = req;
 		sti();
+		// 直接执行当前请求
 		(dev->request_fn)();
 		return;
 	}
+	// 如果当前有在执行的请求
+	// 电梯算法，让磁头的移动距离最短
 	for ( ; tmp->next ; tmp=tmp->next)
 		if ((IN_ORDER(tmp,req) ||
 		    !IN_ORDER(tmp,tmp->next)) &&
 		    IN_ORDER(req,tmp->next))
 			break;
+	// req被插入到了请求项队列中，等待被执行
 	req->next=tmp->next;
 	tmp->next=req;
 	sti();
@@ -88,12 +94,13 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 
 static void make_request(int major,int rw, struct buffer_head * bh)
 {
+	// 这个一个请求的结构，用它来构建请求
 	struct request * req;
 	int rw_ahead;
 
 /* WRITEA/READA is special case - it is not really needed, so if the */
 /* buffer is locked, we just forget about it, else it's a normal read */
-	// TODO: 预读
+	// TODO: 预读，这个函数先不看
 	if (rw_ahead = (rw == READA || rw == WRITEA)) {
 		if (bh->b_lock)
 			return;
@@ -102,9 +109,12 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 		else
 			rw = WRITE;
 	}
+	// 不是读操作、也不是写操作
 	if (rw!=READ && rw!=WRITE)
 		panic("Bad block dev command, must be R/W/RA/WA");
+	// 给对应缓冲块加锁
 	lock_buffer(bh);
+	// 如果缓冲块不干净，需要先将数据写回
 	if ((rw == WRITE && !bh->b_dirt) || (rw == READ && bh->b_uptodate)) {
 		unlock_buffer(bh);
 		return;
@@ -114,15 +124,19 @@ repeat:
  * we want some room for reads: they take precedence. The last third
  * of the requests are only for reads.
  */
+	// 一共32个请求项函数可以使用
+	// 如果是读,就从最后开始使用;如果是写,就从整个结构的2/3处开始使用
+	// TODO: 读的空间是从末尾到开头,写的空间是从2/3到开头,所以给读的空间更大,因为对用户来说,快读能带来更好的体验
 	if (rw == READ)
 		req = request+NR_REQUEST;
 	else
 		req = request+((NR_REQUEST*2)/3);
-/* find an empty request */
+	/* find an empty request */
+	// 从后往前找,找到一个空的请求项函数
 	while (--req >= request)
 		if (req->dev<0)
 			break;
-/* if none found, sleep on new requests: check for rw_ahead */
+	/* if none found, sleep on new requests: check for rw_ahead */
 	if (req < request) {
 		if (rw_ahead) {
 			unlock_buffer(bh);
@@ -131,16 +145,18 @@ repeat:
 		sleep_on(&wait_for_request);
 		goto repeat;
 	}
-/* fill up the request-info, and add it to the queue */
-	req->dev = bh->b_dev;
-	req->cmd = rw;
+	/* fill up the request-info, and add it to the queue */
+	// 得到对应req后,需要填充其内容,以便进行请求
+	req->dev = bh->b_dev;	// 设备号
+	req->cmd = rw;			// 读还是写命令
 	req->errors=0;
-	req->sector = bh->b_blocknr<<1;
-	req->nr_sectors = 2;
-	req->buffer = bh->b_data;
+	req->sector = bh->b_blocknr<<1;	// 要读的扇区
+	req->nr_sectors = 2;	// 扇区数
+	req->buffer = bh->b_data;	// 对应的缓冲块位置
 	req->waiting = NULL;
 	req->bh = bh;
 	req->next = NULL;
+	// 将当前请求项加载到请求项队列中
 	add_request(major+blk_dev,req);
 }
 
