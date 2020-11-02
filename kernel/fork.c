@@ -98,7 +98,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->tss.ss0 = 0x10;	// 10000
 	p->tss.eip = eip;						// 这行与下一行控制进程1开始运行时执行的代码
 	p->tss.eflags = eflags;
-	p->tss.eax = 0;							// 写死为0，作为返回地址
+	p->tss.eax = 0;							// 写死为0，作为返回地址，这个会在进程被第一次调度时，从main函数中!fork()判断进入init()函数进行初始化
 	p->tss.ecx = ecx;
 	p->tss.edx = edx;
 	p->tss.ebx = ebx;
@@ -132,6 +132,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	if (current->executable)	// 执行文件的i节点
 		current->executable->i_count++;
 	// 进程1的ldt、tss挂载到GDT上（GDT布局：NULL、内核CS、内核DS、NULL、TSS0、LDT0、TSS1、LDT1...）
+	// copy_mem设置了段基址，这里才设置了段限长（为640KB）
 	set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));
 	set_ldt_desc(gdt+(nr<<1)+FIRST_LDT_ENTRY,&(p->ldt));
 	// 设置为就绪态、可以调度了

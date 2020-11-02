@@ -35,6 +35,7 @@ int NR_BUFFERS = 0;
 
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
+	// TODO: 此处关中断是为什么
 	cli();
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait);
@@ -149,6 +150,7 @@ static inline void remove_from_queues(struct buffer_head * bh)
 static inline void insert_into_queues(struct buffer_head * bh)
 {
 /* put at end of free list */
+	// 循环链表，末尾也即是freelist的前一项
 	bh->b_next_free = free_list;
 	bh->b_prev_free = free_list->b_prev_free;
 	free_list->b_prev_free->b_next_free = bh;
@@ -158,6 +160,7 @@ static inline void insert_into_queues(struct buffer_head * bh)
 	bh->b_next = NULL;
 	if (!bh->b_dev)
 		return;
+	// 插入哈希表，哈希表是个链表
 	bh->b_next = hash(bh->b_dev,bh->b_blocknr);
 	hash(bh->b_dev,bh->b_blocknr) = bh;
 	bh->b_next->b_prev = bh;
@@ -166,7 +169,7 @@ static inline void insert_into_queues(struct buffer_head * bh)
 static struct buffer_head * find_buffer(int dev, int block)
 {		
 	struct buffer_head * tmp;
-
+	// 哈希表的速度更快,所以从哈希表去找对应的缓冲块(用设备号和块号作为key)
 	for (tmp = hash(dev,block) ; tmp != NULL ; tmp = tmp->b_next)
 		if (tmp->b_dev==dev && tmp->b_blocknr==block)
 			return tmp;
@@ -179,14 +182,17 @@ static struct buffer_head * find_buffer(int dev, int block)
  * something might happen to it while we sleep (ie a read-error
  * will force it bad). This shouldn't really happen currently, but
  * the code is ready.
+ * @param dev,block 作为哈希映射的key
  */
 struct buffer_head * get_hash_table(int dev, int block)
 {
 	struct buffer_head * bh;
 
 	for (;;) {
+		// 查找有无对应块,未找到则直接返回空
 		if (!(bh=find_buffer(dev,block)))
 			return NULL;
+		// TODO: 找到了则引用计数+1
 		bh->b_count++;
 		wait_on_buffer(bh);
 		if (bh->b_dev == dev && bh->b_blocknr == block)
@@ -202,32 +208,41 @@ struct buffer_head * get_hash_table(int dev, int block)
  *
  * The algoritm is changed: hopefully better, and an elusive bug removed.
  */
+// 检查缓冲块被修改过或者被锁了
 #define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock)
 struct buffer_head * getblk(int dev,int block)
 {
 	struct buffer_head * tmp, * bh;
 
 repeat:
+	// 首先检索哈希表，查找缓冲区是否已经有了对应块，如果有就直接用，没有就返回空
 	if (bh = get_hash_table(dev,block))
 		return bh;
+	// 从空闲块链表中申请一个空闲块,必须是无锁、不脏的
+	// TODO: 即使引用为0，块也可能是脏的、被锁的（可能因为异常关机导致的，刚修改完硬盘就退出了，此时还未从缓冲区写回硬盘）
 	tmp = free_list;
 	do {
 		if (tmp->b_count)
 			continue;
+		// 脏的可能性更大，只有脏了才会同步，所以脏的优先级高
 		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
 			bh = tmp;
 			if (!BADNESS(tmp))
 				break;
 		}
-/* and repeat until we find something good */
+	/* and repeat until we find something good */
 	} while ((tmp = tmp->b_next_free) != free_list);
+	// 此时bh如果仍为空，表示没有申请到空闲块才会进入if
 	if (!bh) {
 		sleep_on(&buffer_wait);
 		goto repeat;
 	}
+	// 确保缓冲块没有加锁
 	wait_on_buffer(bh);
+	// 如果缓冲块正在被使用
 	if (bh->b_count)
 		goto repeat;
+	// 确保内容没有被修改
 	while (bh->b_dirt) {
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
@@ -236,6 +251,7 @@ repeat:
 	}
 /* NOTE!! While we slept waiting for this block, somebody else might */
 /* already have added "this" block to the cache. check it */
+	// 确保申请到的块没有被其他进程使用（用是否挂接到哈希表中去判断；如果中间有中断，则可能发生这种情况）
 	if (find_buffer(dev,block))
 		goto repeat;
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
@@ -243,9 +259,12 @@ repeat:
 	bh->b_count=1;
 	bh->b_dirt=0;
 	bh->b_uptodate=0;
+	// 从空闲队列移除
 	remove_from_queues(bh);
+	// 设置设备号和块号
 	bh->b_dev=dev;
 	bh->b_blocknr=block;
+	// 挂接到哈希表
 	insert_into_queues(bh);
 	return bh;
 }
@@ -263,15 +282,18 @@ void brelse(struct buffer_head * buf)
 /*
  * bread() reads a specified block and returns the buffer that contains
  * it. It returns NULL if the block was unreadable.
+ * @param dev 指定读取的硬盘设备是哪个
+ * @param block 指定读取哪一块
  */
 struct buffer_head * bread(int dev,int block)
 {
 	struct buffer_head * bh;
-
+	// 先在缓存区申请一个未被使用的块
 	if (!(bh=getblk(dev,block)))
 		panic("bread: getblk returned NULL\n");
-	if (bh->b_uptodate)
+	if (bh->b_uptodate)	// 申请的缓冲块需要更新
 		return bh;
+	
 	ll_rw_block(READ,bh);
 	wait_on_buffer(bh);
 	if (bh->b_uptodate)

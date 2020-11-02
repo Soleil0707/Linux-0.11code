@@ -170,15 +170,15 @@ __asm__("str %%ax\n\t" \
  * tha math co-processor latest.
  */
 #define switch_to(n) {\
-struct {long a,b;} __tmp; \
-__asm__("cmpl %%ecx,_current\n\t" \
+struct {long a,b;} __tmp; \				// 用于存储CS和EIP
+__asm__("cmpl %%ecx,_current\n\t" \		// 现在运行的是不是调度的进程，如果是，就不用调度了，跳转到1
 	"je 1f\n\t" \
-	"movw %%dx,%1\n\t" \
-	"xchgl %%ecx,_current\n\t" \
-	"ljmp %0\n\t" \
-	"cmpl %%ecx,_last_task_used_math\n\t" \
+	"movw %%dx,%1\n\t" \				// CS的值给了b
+	"xchgl %%ecx,_current\n\t" \		// 交换task[current]和task[n]
+	"ljmp %0\n\t" \						// long jump这条指令（依据tmp进行跳转）进行了上下文切换，然后跳转到eip指定的程序位置，这条指令使特权从进程0的内核态跳转到了进程1的用户态（该指令后面的指令没有执行，转而执行进程1）
+	"cmpl %%ecx,_last_task_used_math\n\t" \	// 比较是否使用了协处理器
 	"jne 1f\n\t" \
-	"clts\n" \
+	"clts\n" \							// 清除CR0中的切换任务标志
 	"1:" \
 	::"m" (*&__tmp.a),"m" (*&__tmp.b), \
 	"d" (_TSS(n)),"c" ((long) task[n])); \

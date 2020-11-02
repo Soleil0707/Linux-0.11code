@@ -139,7 +139,7 @@ void main(void)		/* This really IS void, no error here. */
 	sti();			// 开启中断，EFLAGS寄存器中的IF置为1，表示允许中断
 	move_to_user_mode();	// 特权级翻转，由0至3
 	if (!fork()) {		/* we count on this going ok */ //这一行创建了进程1
-		init();
+		init();	//进程1会进入此循环执行
 	}
 /*
  *   NOTE!!   For any other task 'pause()' would mean we have to get a
@@ -169,10 +169,11 @@ static char * envp_rc[] = { "HOME=/", NULL };
 static char * argv[] = { "-/bin/sh",NULL };
 static char * envp[] = { "HOME=/usr/root", NULL };
 
+// 进程初始化函数
 void init(void)
 {
 	int pid,i;
-
+	// setup系统调用，传入参数为机器系统数据放置的地址
 	setup((void *) &drive_info);
 	(void) open("/dev/tty0",O_RDWR,0);
 	(void) dup(0);

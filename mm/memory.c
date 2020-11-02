@@ -62,7 +62,7 @@ static unsigned char mem_map [ PAGING_PAGES ] = {0,};
  */
 // 申请一个页，声明为已使用(mem_map数组)
 // 该函数从主内存的最末端开始，向前循环查找空白页
-// TODO: 页面清零,返回的是物理地址
+// TODO: 页面清零,返回的是物理地址，同时也是线性地址（内核会恒等映射）
 unsigned long get_free_page(void)
 {
 register unsigned long __res asm("ax");
@@ -178,17 +178,17 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 			panic("copy_page_tables: already exist");
 		if (!(1 & *from_dir))	// 如果源页目录表项不存在（也即是对应页表不存在），则跳过此次循环
 			continue;
-		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);	// 页目录项的内容就是页表的起始地址
-		if (!(to_page_table = (unsigned long *) get_free_page()))	// 申请一个空页，用于存储子进程的页表
+		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);	// 页目录项的内容就是页表的起始地址，所以低12位为0（4K整页对齐）
+		if (!(to_page_table = (unsigned long *) get_free_page()))	// 申请一个空页，用于存储子进程的页表（属于内核态而非用户态，用户态会被修改，容易出现危险）
 			return -1;	/* Out of memory, see freeing */
-		*to_dir = ((unsigned long) to_page_table) | 7;
-		nr = (from==0)?0xA0:1024;	//如果是第一个页表，只复制前160项（一个页表项控制4KB的页，160*4=640KB，正好是进程0的全部内存空间）
+		*to_dir = ((unsigned long) to_page_table) | 7;	// 页表所在页的属性 111表示用户、可写、存在（s/u | r/w | 存在）
+		nr = (from==0)?0xA0:1024;	//如果是第一个页表，只复制前160项（一个页表项控制4KB的页，160*4=640KB，正好是进程0的段限长）
 		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {	// 循环一次，就对应一个页表项
-			this_page = *from_page_table;	// 通过页表项的值，得到页的起始地址
+			this_page = *from_page_table;	// 通过页表项的值，得到页的起始地址（一个页表项的值）
 			if (!(1 & this_page))
 				continue;
-			this_page &= ~2;	// 页的属性 101表示用户、只读、存在
-			*to_page_table = this_page;
+			this_page &= ~2;	// 页表项对应页的属性 101表示用户、只读、存在（s/u | r/w | 存在）
+			*to_page_table = this_page;	// 将该页表项拷贝到目标页
 			if (this_page > LOW_MEM) {
 				*from_page_table = this_page;
 				this_page -= LOW_MEM;

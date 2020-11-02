@@ -229,6 +229,9 @@ setup_paging:
 ; 设置最后一个页表项
 	movl $pg3+4092,%edi
 ; 7表示页的属性标识位，前面表示物理地址，即0xfff000
+; 7表示为111，分别意为：可读、属于用户、该页存在
+; TODO: 这里将页面设置为用户的页，是因为后续进程0的执行过程中将直接由内核态翻转为用户态
+; 如果设置为内核的页，那么翻转之后的用户态无法继续往下执行
 	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
 	std
 1:	stosl			/* fill pages backwards - more efficient :-) */

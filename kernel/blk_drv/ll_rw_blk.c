@@ -29,6 +29,7 @@ struct task_struct * wait_for_request = NULL;
  *	do_request-address
  *	next-request
  */
+// 块设备的数量，一个表示一个设备
 struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{ NULL, NULL },		/* no_dev */
 	{ NULL, NULL },		/* dev mem */
@@ -92,6 +93,7 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 
 /* WRITEA/READA is special case - it is not really needed, so if the */
 /* buffer is locked, we just forget about it, else it's a normal read */
+	// TODO: 预读
 	if (rw_ahead = (rw == READA || rw == WRITEA)) {
 		if (bh->b_lock)
 			return;
@@ -142,15 +144,20 @@ repeat:
 	add_request(major+blk_dev,req);
 }
 
+// 先检查是否有相关的请求项函数，然后再使用请求项函数进行请求（制作请求并添加到请求队列）
 void ll_rw_block(int rw, struct buffer_head * bh)
 {
 	unsigned int major;
-
+	// 判断缓冲块对应的设备与请求项函数是否成功挂接
+	// 设备号右移8位，0x300得到的为3，刚好是NR_BLK_DEV中对应的硬盘那一项，而且对应的请求项函数已经挂接
+	// 确定是有效设备；确定有相关请求项函数
 	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
 	!(blk_dev[major].request_fn)) {
 		printk("Trying to read nonexistent block-device\n\r");
 		return;
 	}
+	// 制作一个请求项，用于请求硬盘数据到缓冲区
+	// 哪个设备、读还是写、操作的位置
 	make_request(major,rw,bh);
 }
 

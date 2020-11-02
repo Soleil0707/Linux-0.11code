@@ -107,7 +107,7 @@ void schedule(void)
 	struct task_struct ** p;
 
 /* check alarm, wake up any interruptible tasks that have got a signal */
-
+	// 从后往前查询进程数组中的64个进程，处理alarm和signal                 
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
 		if (*p) {
 			if ((*p)->alarm && (*p)->alarm < jiffies) {
@@ -127,9 +127,9 @@ void schedule(void)
 		i = NR_TASKS;
 		p = &task[NR_TASKS];
 		while (--i) {
-			if (!*--p)
+			if (!*--p)	// 如果p为空，则continue
 				continue;
-			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
+			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)	// 进程处于就绪态，且时间片最大，则令其运行
 				c = (*p)->counter, next = i;
 		}
 		if (c) break;

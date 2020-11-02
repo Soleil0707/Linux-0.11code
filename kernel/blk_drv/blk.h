@@ -12,6 +12,7 @@
  * buffers when they are in the queue. 64 seems to be too many (easily
  * long pauses in reading when heavy writing/syncing is going on)
  */
+// TODO: 32项是为了满足CPU和外设处理数据时间的数量级
 #define NR_REQUEST	32
 
 /*

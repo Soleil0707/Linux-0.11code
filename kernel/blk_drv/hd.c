@@ -80,20 +80,24 @@ int sys_setup(void * BIOS)
 		return -1;
 	callable = 0;
 #ifndef HD_TYPE
+	// 读取drive info并设置hard info
 	for (drive=0 ; drive<2 ; drive++) {
-		hd_info[drive].cyl = *(unsigned short *) BIOS;
-		hd_info[drive].head = *(unsigned char *) (2+BIOS);
+		hd_info[drive].cyl = *(unsigned short *) BIOS;	// 柱面数
+		hd_info[drive].head = *(unsigned char *) (2+BIOS);	// 磁头数
 		hd_info[drive].wpcom = *(unsigned short *) (5+BIOS);
 		hd_info[drive].ctl = *(unsigned char *) (8+BIOS);
 		hd_info[drive].lzone = *(unsigned short *) (12+BIOS);
-		hd_info[drive].sect = *(unsigned char *) (14+BIOS);
+		hd_info[drive].sect = *(unsigned char *) (14+BIOS);	// 每个磁道的扇区数
 		BIOS += 16;
 	}
+	// 判断有几个硬盘
 	if (hd_info[1].cyl)
 		NR_HD=2;
 	else
 		NR_HD=1;
 #endif
+	// 一个物理盘可划分为4个逻辑盘，即0是物理盘，1-4是它的逻辑盘；5是第二个物理盘
+	// 每个物理盘的起始扇区，以及扇区数
 	for (i=0 ; i<NR_HD ; i++) {
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = hd_info[i].head*
@@ -133,7 +137,9 @@ int sys_setup(void * BIOS)
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = 0;
 	}
+	// 物理盘的设备号是0x300+i*5,第一个物理盘就是0x300，读取物理盘的第一个块（引导块，其中包含分区信息）
 	for (drive=0 ; drive<NR_HD ; drive++) {
+		// bread函数，即block read，将引导块读入缓冲区，返回该块在缓冲区中的地址
 		if (!(bh = bread(0x300 + drive*5,0))) {
 			printk("Unable to read partition table of drive %d\n\r",
 				drive);
