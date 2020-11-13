@@ -221,7 +221,9 @@ _sys_fork:
 	addl $20,%esp	# 清空栈顶的五个寄存器值，即'call _copy_process'上面的五个
 1:	ret
 
+; 硬盘的中断服务程序，第一次被调用是进程1读硬盘引导块完成后返回
 _hd_interrupt:
+	; 中断保存现场（硬件中断会自动压栈5个寄存器，SS、ESP、EFLAGS、CS、EIP）
 	pushl %eax
 	pushl %ecx
 	pushl %edx
@@ -238,6 +240,7 @@ _hd_interrupt:
 	jmp 1f			# give port chance to breathe
 1:	jmp 1f
 1:	xorl %edx,%edx
+	; _do_hd是挂接的硬盘中断处理程序，第一次执行时挂接的是read_intr
 	xchgl _do_hd,%edx
 	testl %edx,%edx
 	jne 1f

@@ -125,8 +125,8 @@ void schedule(void)
 	// TODO: 第二次从进程1调度,因为进程1为不可中断等待,进程0为可中断的等待状态,不存在就绪态的进程,因此会强制执行进程0
 	while (1) {
 		// TODO: c的默认值为-1,next默认值为0,因此如果找不到需要调度的进程,就去强制执行进程0
-		c = -1;
-		next = 0;
+		c = -1;	// c表示count，时间片
+		next = 0;	// next表示task中进程的下标
 		i = NR_TASKS;
 		p = &task[NR_TASKS];
 		while (--i) {

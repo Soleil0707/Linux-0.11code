@@ -104,6 +104,7 @@ extern inline void unlock_buffer(struct buffer_head * bh)
 	if (!bh->b_lock)
 		printk(DEVICE_NAME ": free buffer being unlocked\n");
 	bh->b_lock=0;
+	// 唤醒等待这个缓冲块的进程，但此时为空
 	wake_up(&bh->b_wait);
 }
 
@@ -112,6 +113,7 @@ extern inline void end_request(int uptodate)
 	DEVICE_OFF(CURRENT->dev);
 	if (CURRENT->bh) {
 		CURRENT->bh->b_uptodate = uptodate;
+		// 给缓冲块解锁
 		unlock_buffer(CURRENT->bh);
 	}
 	if (!uptodate) {

@@ -36,6 +36,7 @@ int NR_BUFFERS = 0;
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
 	// TODO: 关中断表示不再允许时钟中断了，但是此时可以主动让出CPU给其他进程
+	// TODO: 关中断关的是自己进程的中断，切换进程后关中断就无效了(TSS会保存eflags寄存器)
 	cli();
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait);
@@ -297,7 +298,8 @@ struct buffer_head * bread(int dev,int block)
 	ll_rw_block(READ,bh);
 	// 挂起等待引导块被读完，然后再继续处理引导块,此时会发生进程切换
 	wait_on_buffer(bh);
-	if (bh->b_uptodate)
+	// 等两个扇区，即一个引导块全部读取完成，从此处继续执行
+	if (bh->b_uptodate)	// 此时为1
 		return bh;
 	brelse(bh);
 	return NULL;

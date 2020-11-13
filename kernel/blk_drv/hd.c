@@ -145,21 +145,27 @@ int sys_setup(void * BIOS)
 				drive);
 			panic("");
 		}
+		// TODO: 考试范围到这里********************************
+		// 硬盘信息的有效标志为55AA，位于第一扇区的最后两个字节
 		if (bh->b_data[510] != 0x55 || (unsigned char)
 		    bh->b_data[511] != 0xAA) {
 			printk("Bad partition table on drive %d\n\r",drive);
 			panic("");
 		}
+		// 根据引导块中的分区信息设置hd[]
 		p = 0x1BE + (void *)bh->b_data;
 		for (i=1;i<5;i++,p++) {
 			hd[i+5*drive].start_sect = p->start_sect;
 			hd[i+5*drive].nr_sects = p->nr_sects;
 		}
+		// 释放在缓存区中的该引导块
 		brelse(bh);
 	}
 	if (NR_HD)
 		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
+	// 虚拟盘的初始化,将虚拟盘设置为根设备
 	rd_load();
+	// 加载根文件系统,基于根设备
 	mount_root();
 	return (0);
 }
@@ -255,6 +261,7 @@ static void bad_rw_intr(void)
 		reset = 1;
 }
 
+// 这个函数挂接在hd_out()函数中，后续会被中断服务程序调用，用于在从硬盘读数据完成后的处理
 static void read_intr(void)
 {
 	if (win_result()) {
@@ -262,11 +269,14 @@ static void read_intr(void)
 		do_hd_request();
 		return;
 	}
+	// 读取一个扇区，256字（即512字节，半个缓冲块，一个扇区）的数据到缓冲区块
 	port_read(HD_DATA,CURRENT->buffer,256);
 	CURRENT->errors = 0;
 	CURRENT->buffer += 512;
 	CURRENT->sector++;
+	// 每次读一个扇区，计算是否还需要读取扇区
 	if (--CURRENT->nr_sectors) {
+		// 再次绑定，以便继续从硬盘读取数据进行处理
 		do_hd = &read_intr;
 		return;
 	}

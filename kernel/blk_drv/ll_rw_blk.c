@@ -69,6 +69,7 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 	req->next = NULL;
 	cli();
 	if (req->bh)
+		// 这里将脏位清除了
 		req->bh->b_dirt = 0;
 	// 如果当前没有请求，则进入if执行
 	if (!(tmp = dev->current_request)) {
@@ -126,7 +127,7 @@ repeat:
  */
 	// 一共32个请求项函数可以使用
 	// 如果是读,就从最后开始使用;如果是写,就从整个结构的2/3处开始使用
-	// TODO: 读的空间是从末尾到开头,写的空间是从2/3到开头,所以给读的空间更大,因为对用户来说,快读能带来更好的体验
+	// TODO: 读的空间是从末尾到开头,写的空间是从2/3到开头,所以给读的空间更大,因为对用户来说,快读能带来更好的体验（也可以理解成读比写的概率高）
 	if (rw == READ)
 		req = request+NR_REQUEST;
 	else
@@ -134,6 +135,7 @@ repeat:
 	/* find an empty request */
 	// 从后往前找,找到一个空的请求项函数
 	while (--req >= request)
+		// 如果是-1表示没有被占用,因为初始化时默认为-1.（blk_dev_init函数）
 		if (req->dev<0)
 			break;
 	/* if none found, sleep on new requests: check for rw_ahead */
@@ -142,6 +144,8 @@ repeat:
 			unlock_buffer(bh);
 			return;
 		}
+		// 没找到空闲的请求项，当前进程就sleep停等，放入链表表示在等待请求项，如果有了请求项再唤醒
+		// TODO: 这个队列在sleep_on函数中,每次tmp指向上一个刚等待的进程,current指向当前进程,这样在唤醒时,最晚沉睡的进程最先醒来
 		sleep_on(&wait_for_request);
 		goto repeat;
 	}
